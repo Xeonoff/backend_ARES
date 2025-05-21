@@ -2,6 +2,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
 from ares import models, serializers
 
@@ -25,8 +26,32 @@ class HandleConstraints(APIView):
     
     def get_paginated_response(self, data):
         return self.paginator.get_paginated_response(data)
+    def get_queryset(self):
+        queryset = models.Constraints.objects.all()
+        
+        # Фильтрация по параметрам
+        filters = {
+            'name__icontains': self.request.query_params.get('name'),
+            'faculty': self.request.query_params.get('faculty'),
+            'semester': self.request.query_params.get('semester'),
+            'building': self.request.query_params.get('building'),
+            'department': self.request.query_params.get('department'),
+        }
+        
+        # Собираем условия фильтрации
+        filter_kwargs = {k: v for k, v in filters.items() if v is not None}
+        
+        # Обрабатываем числовое поле
+        if 'semester' in filter_kwargs:
+            try:
+                filter_kwargs['semester'] = int(filter_kwargs['semester'])
+            except ValueError:
+                raise ValidationError({'semester': 'Must be an integer'})
+        
+        return queryset.filter(**filter_kwargs)
 
-    def get(self, request, name=None, format=None):
+    def get(self, request, name=None, format=None, *args, **kwargs):
+        queryset = self.get_queryset()
         if name:
             constraint = get_object_or_404(models.Constraints, name=name)
             serializer = serializers.ConstraintSerializer(constraint)
@@ -34,7 +59,7 @@ class HandleConstraints(APIView):
         
         constraints = models.Constraints.objects.all()
         
-        page = self.paginate_queryset(constraints)
+        page = self.paginate_queryset(queryset)
         if page is not None:
             serializer = serializers.ConstraintSerializer(page, many=True)
             return self.get_paginated_response(serializer.data)
