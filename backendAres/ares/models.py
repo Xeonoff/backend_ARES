@@ -1,5 +1,31 @@
 from django.db import models
 from behave.parser import Parser
+from django.contrib.auth.models import AbstractUser, Group, Permission
+
+class User_stuff(AbstractUser):
+    stuff_id = models.CharField(max_length=100, blank=True, null=True)
+
+    groups = models.ManyToManyField(
+        Group,
+        verbose_name='groups',
+        blank=True,
+        help_text='The groups this user belongs to.',
+        related_name="custom_user_groups",
+        related_query_name="custom_user_group",
+    )
+    
+    user_permissions = models.ManyToManyField(
+        Permission,
+        verbose_name='user permissions',
+        blank=True,
+        help_text='Specific permissions for this user.',
+        related_name="custom_user_permissions",
+        related_query_name="custom_user_permission",
+    )
+
+    def __str__(self):
+        return self.username
+
 
 class Constraints(models.Model):
     name = models.TextField(primary_key=True)

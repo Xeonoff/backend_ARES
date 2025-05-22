@@ -2,6 +2,8 @@ from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
+
+import requests
 from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
 from ares import models, serializers
@@ -86,3 +88,46 @@ class HandleConstraints(APIView):
             serializer.save()
             return Response(serializer.data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+class OAuthCallbackView(APIView):
+    def post(self, request):
+        code = request.data.get('code')
+        redirect_uri = request.data.get('redirect_uri')
+
+        token_response = requests.post(
+            f"https://science.iu5.bmstu.ru/sso/token?code={code}"
+        )
+
+        if token_response.status_code != 200:
+            return Response({'error': 'Invalid authorization code'}, status=400)
+
+        access_token = token_response.json().get('access_token')
+
+        user_response = requests.get(
+            f"https://science.iu5.bmstu.ru/sso/person?access_token={access_token}"
+        )
+
+        if user_response.status_code != 200:
+            return Response({'error': 'Failed to fetch user data'}, status=400)
+
+        user_data = user_response.json()
+
+        user, _ = models.User_stuff.objects.update_or_create(
+            username=user_data['username'],
+            defaults={
+                'first_name': user_data.get('first_name', ''),
+                'last_name': user_data.get('last_name', ''),
+                'is_staff': user_data.get('is_staff', False)
+            }
+        )
+
+        return Response({
+            'access_token': access_token,
+            'user': {
+                'id': user.stuff_id,
+                'username': user.username,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'is_staff': user.is_staff
+            }
+        })
