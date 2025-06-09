@@ -2,6 +2,30 @@ from django.db import models
 from behave.parser import Parser
 from django.contrib.auth.models import AbstractUser, Group, Permission
 
+class Lesson(models.Model):
+    short_name = models.CharField(max_length=255)
+    activity_type_name = models.CharField(max_length=255)
+    semester = models.IntegerField()
+    department = models.CharField(max_length=255)
+    faculty = models.CharField(max_length=255, blank=True, null=True)
+    grp = models.CharField(max_length=255, blank=True, null=True)
+    teacher = models.CharField(max_length=255, blank=True, null=True)
+
+    class Meta:
+        db_table = 'lessons'
+
+class Audience(models.Model):
+    id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=50)
+    floor = models.IntegerField()
+    building = models.CharField(max_length=100)
+
+    class Meta:
+        db_table = 'audience'
+        
+    def __str__(self):
+        return f"{self.building} {self.name} (этаж {self.floor})"
+    
 class User_stuff(AbstractUser):
     stuff_id = models.CharField(max_length=100, blank=True, null=True)
 

@@ -2,7 +2,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-
+from django.db.models import Min
 import requests
 from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
@@ -30,8 +30,7 @@ class HandleConstraints(APIView):
         return self.paginator.get_paginated_response(data)
     def get_queryset(self):
         queryset = models.Constraints.objects.all()
-        
-        # Фильтрация по параметрам
+
         filters = {
             'name__icontains': self.request.query_params.get('name'),
             'faculty': self.request.query_params.get('faculty'),
@@ -39,11 +38,9 @@ class HandleConstraints(APIView):
             'building': self.request.query_params.get('building'),
             'department': self.request.query_params.get('department'),
         }
-        
-        # Собираем условия фильтрации
+
         filter_kwargs = {k: v for k, v in filters.items() if v is not None}
-        
-        # Обрабатываем числовое поле
+
         if 'semester' in filter_kwargs:
             try:
                 filter_kwargs['semester'] = int(filter_kwargs['semester'])
@@ -131,3 +128,72 @@ class OAuthCallbackView(APIView):
                 'is_staff': user.is_staff
             }
         })
+    
+class AudienceListView(APIView):
+    def get(self, request):
+        building_filter = request.query_params.get('building', None)
+        floor_filter = request.query_params.get('floor', None)
+
+        queryset = models.Audience.objects.all()
+
+        if building_filter:
+            queryset = queryset.filter(building__icontains=building_filter)
+        
+        if floor_filter:
+            try:
+                floor_value = int(floor_filter)
+                queryset = queryset.filter(floor=floor_value)
+            except ValueError:
+                return Response({"error": "Floor must be an integer"}, status=400)
+        
+        min_ids = queryset.values('name').annotate(min_id=Min('id')).values_list('min_id', flat=True)
+
+        unique_queryset = queryset.filter(id__in=min_ids)
+
+        result = [
+            {
+                "id": aud.id,
+                "name": aud.name,
+                "floor": aud.floor,
+                "building": aud.building
+            }
+            for aud in unique_queryset
+        ]
+        
+        return Response(result)
+
+class UniqueTeachersView(APIView):
+    def get(self, request):
+        teachers = models.Lesson.objects.exclude(teacher__isnull=True).exclude(teacher='') \
+                                .order_by('teacher') \
+                                .distinct('teacher') \
+                                .values_list('teacher', flat=True)
+                                
+        return Response(list(teachers))
+
+class UniqueBuildingsView(APIView):
+    def get(self, request):
+        buildings = models.Audience.objects.order_by('building') \
+                                   .values_list('building', flat=True) \
+                                   .distinct()
+
+        building_list = list(buildings)
+        
+        return Response(building_list)
+
+class LessonListView(APIView):
+    def get(self, request):
+        lessons = models.Lesson.objects.all()
+        result = [
+            {
+                "short_name" : lesson.short_name,
+                "activity_type_name" : lesson.activity_type_name,
+                "semester" : lesson.semester,
+                "department" : lesson.department,
+                "faculty" : lesson.faculty,
+                "grp" : lesson.grp,
+                "teacher" : lesson.teacher
+            }
+            for lesson in lessons
+        ]
+        return Response(result)

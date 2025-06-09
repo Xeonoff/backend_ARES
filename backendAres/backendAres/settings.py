@@ -77,7 +77,7 @@ WSGI_APPLICATION = 'backendAres.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
-        'NAME': 'test-ares-db',
+        'NAME': 'aresDB',
         'USER': 'postgres',
         'PASSWORD': 'Ilya2003iq152',
         'HOST': 'localhost',
